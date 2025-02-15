@@ -6,6 +6,7 @@ import bpy
 import librosa
 
 path_root = "E:/beat-bounce/"
+frame_rate = 24  # 帧率为24fps
 
 
 def audio_processing_load(audio_path):
@@ -16,7 +17,6 @@ def audio_processing_load(audio_path):
     tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
 
     # 将节拍时间点转换为帧数（假设Blender的帧率为24fps）
-    frame_rate = 24
     beat_frames_in_blender = [int(beat * frame_rate) for beat in librosa.frames_to_time(beat_frames, sr=sr)]
 
     return tempo, beat_frames_in_blender
@@ -29,6 +29,13 @@ def create_ball():
     return ball
 
 
+def create_ground():
+    """创建一个长方形表面并返回其引用"""
+    bpy.ops.mesh.primitive_plane_add(size=10, location=(0, 0, 0))
+    ground = bpy.context.object
+    return ground
+
+
 def animation_generation_load(tempo, beat_frames):
     # 如果没有找到名为"Ball"的对象，则创建一个新的
     if 'Ball' not in bpy.data.objects:
@@ -37,12 +44,37 @@ def animation_generation_load(tempo, beat_frames):
     else:
         ball = bpy.data.objects['Ball']
 
+    # 创建地面
+    if 'Ground' not in bpy.data.objects:
+        ground = create_ground()
+        ground.name = 'Ground'
+
     # 设置起始帧
     frame_start = 1
+    bounce_height = 5  # 每次弹起的高度
+    gravity_acceleration = -9.81 / (frame_rate ** 2)  # 简化的重力加速度
+
     for i, beat_frame in enumerate(beat_frames):
-        # 在每个节拍处设置关键帧
-        bpy.context.scene.frame_set(beat_frame + frame_start)
-        ball.location.z = (i % 2) * 2  # 简单的上下移动
+        # 计算从当前节拍到下一个节拍的时间间隔（帧数）
+        next_beat_frame = beat_frames[i + 1] if i + 1 < len(beat_frames) else beat_frames[-1] + 30  # 假设最后一个节拍后有额外的30帧
+        interval_frames = next_beat_frame - beat_frame
+
+        # 在每个节拍处设置关键帧：球下落
+        bpy.context.scene.frame_set(beat_frame)
+        ball.location.z = bounce_height
+        ball.keyframe_insert(data_path="location", index=2)
+
+        # 在节拍之间设置关键帧：球上升和下降
+        for frame in range(1, interval_frames):
+            bpy.context.scene.frame_set(beat_frame + frame)
+            t = frame / interval_frames  # 时间归一化
+            z_position = bounce_height * (1 - 4 * t * (1 - t))  # 弹簧函数模拟反弹
+            ball.location.z = z_position
+            ball.keyframe_insert(data_path="location", index=2)
+
+        # 最终落到地面的关键帧
+        bpy.context.scene.frame_set(next_beat_frame)
+        ball.location.z = 0
         ball.keyframe_insert(data_path="location", index=2)
 
 
@@ -66,7 +98,7 @@ def merge_audio_video_with_ffmpeg(audio_path, image_sequence_path, output_path):
     command = [
         os.path.join(path_root, "ffmpeg-7.1-essentials_build", "bin", "ffmpeg.exe"),
         '-y',  # 覆盖输出文件
-        '-framerate', '24',  # 帧率
+        '-framerate', str(frame_rate),  # 帧率
         '-i', image_sequence_path,  # 输入图像序列
         '-i', audio_path,  # 输入音频
         '-c:v', 'libx264',  # 视频编码器
