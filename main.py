@@ -94,8 +94,7 @@ if __name__ == "__main__":
     # 生成小球或其他元素跟随音乐节奏弹跳的动画
     animation_generation_load(tempo, beat_frames)
 
-    # 设置渲染输出路径
-    # 获取时间戳
+    # 设置渲染输出路径, 获取时间戳
     timestamp = get_timestamp()
     output_image_sequence_path = os.path.join(path_root, "path", "frame", f"{timestamp}_")  # 图像序列输出路径
     final_output_video_path = os.path.join(path_root, "path", f"final_video_{timestamp}.mp4")  # 最终视频输出路径
