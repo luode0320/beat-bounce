@@ -1,12 +1,11 @@
 import os
-import subprocess
 from datetime import datetime
 
 import bpy
 import librosa
 
-path_root = "E:/beat-bounce/"
-frame_rate = 24  # 帧率为24fps
+# 假设帧率为24FPS
+frame_rate = 24
 
 
 def audio_processing_load(audio_path):
@@ -24,7 +23,7 @@ def audio_processing_load(audio_path):
 
 def create_ball():
     """创建一个球体并返回其引用"""
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, location=(0, 0, 1))
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=1, location=(0, 0, 5))  # 初始位置在空中
     ball = bpy.context.object
     return ball
 
@@ -83,60 +82,53 @@ def render_animation(output_path):
     渲染Blender场景到指定路径
     :param output_path: 输出文件夹或文件路径
     """
-    bpy.context.scene.render.image_settings.file_format = 'PNG'  # 或者 'FFMPEG' 如果直接输出视频
-    bpy.context.scene.render.filepath = output_path  # 对于图像序列
+    # 设置输出格式为FFMPEG视频
+    bpy.context.scene.render.image_settings.file_format = 'FFMPEG'
+
+    # 设置输出路径
+    bpy.context.scene.render.filepath = output_path
+
+    # 设置编码器和其他视频参数
+    bpy.context.scene.render.ffmpeg.format = 'MPEG4'
+    bpy.context.scene.render.ffmpeg.codec = 'H264'
+    bpy.context.scene.render.ffmpeg.constant_rate_factor = 'PERC_LOSSLESS'  # 可以是 'NONE', 'LOSSLESS', 'PERC_LOSSLESS', 'HIGH', 'MEDIUM', 'LOW'
+    bpy.context.scene.render.ffmpeg.ffmpeg_preset = 'GOOD'  # 预设可以是 'BEST', 'GOOD', 'REALTIME'
+    bpy.context.scene.render.resolution_x = 1920  # 分辨率宽度
+    bpy.context.scene.render.resolution_y = 1080  # 分辨率高度
+    bpy.context.scene.render.resolution_percentage = 100  # 分辨率百分比
+    bpy.context.scene.render.fps = frame_rate  # 帧率
+
+    # 开始渲染
     bpy.ops.render.render(animation=True)
-
-
-def merge_audio_video_with_ffmpeg(audio_path, image_sequence_path, output_path):
-    """
-    使用FFmpeg合并音频和图像序列成视频
-    :param audio_path: 音频文件路径
-    :param image_sequence_path: 图像序列路径（包含通配符）
-    :param output_path: 输出视频文件路径
-    """
-    command = [
-        os.path.join(path_root, "ffmpeg-7.1-essentials_build", "bin", "ffmpeg.exe"),
-        '-y',  # 覆盖输出文件
-        '-framerate', str(frame_rate),  # 帧率
-        '-i', image_sequence_path,  # 输入图像序列
-        '-i', audio_path,  # 输入音频
-        '-c:v', 'libx264',  # 视频编码器
-        '-pix_fmt', 'yuv420p',  # 像素格式
-        '-c:a', 'aac',  # 音频编码器
-        '-strict', 'experimental',  # 允许实验性功能
-        '-b:a', '192k',  # 音频比特率
-        output_path  # 输出文件路径
-    ]
-    subprocess.run(command)
 
 
 # 获取当前时间戳并格式化
 def get_timestamp():
     now = datetime.now()
-    return now.strftime("%Y-%m-%d_%H%M")
+    return now.strftime("%Y%m%d_%H%M%S")
 
 
 # Blender主脚本入口
 if __name__ == "__main__":
+    # 定义根路径
+    path_root = '/path/to/your/project/'  # 替换为实际的根路径
+
+    # 获取时间戳
+    timestamp = get_timestamp()
+
+    # 设置渲染输出路径（带有时间戳）
+    output_directory = f"{path_root}output_{timestamp}"
+    final_output_video_path = os.path.join(output_directory, f"final_video_{timestamp}.mp4")  # 最终视频输出路径
+
+    # 创建输出目录（如果不存在）
+    os.makedirs(os.path.dirname(final_output_video_path), exist_ok=True)
+
     # 提取音乐节拍
-    audio_path = os.path.join(path_root, "file", "win臣 - 银行不妙曲 (超燃).flac")
+    audio_path = '/path/to/your/audio/file.flac'  # 替换为实际的音频文件路径
     tempo, beat_frames = audio_processing_load(audio_path)
 
-    # 生成小球或其他元素跟随音乐节奏弹跳的动画
+    # 生成小球及其他元素跟随音乐节奏弹跳的动画
     animation_generation_load(tempo, beat_frames)
 
-    # 设置渲染输出路径, 获取时间戳
-    timestamp = get_timestamp()
-    output_image_sequence_path = os.path.join(path_root, "path", "frame", f"{timestamp}_")  # 图像序列输出路径
-    final_output_video_path = os.path.join(path_root, "path", f"final_video_{timestamp}.mp4")  # 最终视频输出路径
-
-    # 渲染动画
-    render_animation(output_image_sequence_path)
-
-    # 合并音频和视频
-    merge_audio_video_with_ffmpeg(
-        audio_path=audio_path,
-        image_sequence_path=output_image_sequence_path + '%04d.png',  # 假设是四位数字编号的序列
-        output_path=final_output_video_path
-    )
+    # 渲染动画并导出为视频
+    render_animation(final_output_video_path)
